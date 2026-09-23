@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>HighNet — Orquestador de Catálogo Multi-Proveedor v1.2</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 1.8cm 1.6cm 1.8cm 1.6cm;
+    }
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 10.2pt;
+      line-height: 1.35;
+      color: #1f2937;
+    }
+    h1, h2, h3, h4 {
+      color: #0f3d75;
+      margin: 0 0 8px 0;
+    }
+    h1 { font-size: 24pt; }
+    h2 { font-size: 17pt; margin-top: 18px; border-bottom: 1px solid #cfd8e3; padding-bottom: 4px; }
+    h3 { font-size: 13pt; margin-top: 14px; }
+    h4 { font-size: 11pt; margin-top: 10px; }
+    p { margin: 0 0 7px 0; }
+    ul, ol { margin: 0 0 8px 18px; }
+    li { margin-bottom: 3px; }
+    .cover {
+      padding-top: 3cm;
+      page-break-after: always;
+    }
+    .cover .eyebrow {
+      font-size: 11pt;
+      color: #52606d;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .cover .subtitle {
+      font-size: 12pt;
+      color: #334e68;
+      margin-bottom: 14px;
+    }
+    .cover .panel {
+      border: 1px solid #cbd2d9;
+      background: #f8fafc;
+      padding: 12px 14px;
+      margin-top: 18px;
+    }
+    .toc ul { margin-left: 14px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 12px 0;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #cbd2d9;
+      padding: 6px 7px;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+    th {
+      background: #e8eef7;
+      color: #102a43;
+      font-weight: bold;
+    }
+    .small { font-size: 9pt; }
+    .muted { color: #52606d; }
+    .note {
+      border-left: 4px solid #2f80ed;
+      background: #f3f8ff;
+      padding: 8px 10px;
+      margin: 8px 0 12px 0;
+    }
+    .warning {
+      border-left-color: #f2994a;
+      background: #fff8f0;
+    }
+    .diagram {
+      white-space: pre-wrap;
+      font-family: Courier, monospace;
+      font-size: 8.8pt;
+      line-height: 1.3;
+      background: #f8fafc;
+      border: 1px solid #cbd2d9;
+      padding: 10px;
+      margin: 8px 0 10px 0;
+    }
+    .page-break { page-break-before: always; }
+    .section-intro { color: #334e68; }
+    .pill {
+      display: inline-block;
+      border: 1px solid #bfd3f2;
+      background: #eef5ff;
+      color: #0f3d75;
+      font-size: 8.5pt;
+      padding: 2px 6px;
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="eyebrow">HighNet · Documento de diseño técnico · Confidencial</div>
+    <h1>Orquestador de Catálogo Multi-Proveedor</h1>
+    <div class="subtitle">Versión 1.2 · Septiembre 2026</div>
+    <p><strong>Integración editorial y técnica de la propuesta inicial v1.0 con el cambio adicional incorporado en la v1.1.</strong></p>
+    <p>Base conceptual: <em>v1.1</em>. Reintegraciones desde <em>v1.0</em>: alcance original del cotizador, campos y trazabilidad del contrato unificado, detalle del flujo de cotización interna, y tablas de expansión futura para listas de precios por cliente/subcuenta.</p>
+    <div class="panel">
+      <p><strong>Propósito de esta versión</strong></p>
+      <ul>
+        <li>Conservar en un solo documento la propuesta completa de cambio al sitio web de HighNet.</li>
+        <li>Tomar como vigente el cambio adicional de la v1.1: comercialización configurable, panel admin y separación estricta entre precio público y costo.</li>
+        <li>Recuperar de la v1.0 la información que seguía siendo válida y había quedado resumida o relegada a fases posteriores.</li>
+        <li>Eliminar solo duplicados reales y anotar diferencias de versión cuando convenga para evitar ambigüedad.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="toc">
+    <h2>Contenido</h2>
+    <ul>
+      <li>1. Contexto, objetivo y alcance integrado</li>
+      <li>2. Arquitectura general — actores y fronteras</li>
+      <li>3. Flujo de consulta de catálogo y precio de venta</li>
+      <li>4. Flujo de resiliencia ante fallas</li>
+      <li>5. Pipeline interno del normalizador</li>
+      <li>6. Contratos de producto (público vs. admin)</li>
+      <li>7. Normas de calidad y severidades</li>
+      <li>8. Traza completa de ejemplo</li>
+      <li>9. Tabla de sinónimos de marca</li>
+      <li>10. Mapeo de categorías</li>
+      <li>11. Comercialización: porcentajes, IVA, tipo de cambio y panel admin</li>
+      <li>12. Diseño final de la base de datos</li>
+      <li>13. Motor de selección de proveedor y score de calidad</li>
+      <li>14. Flujo de pedido en sitio y cotización</li>
+      <li>15. Endpoints del backend</li>
+      <li>16. Referencia de la API CT-Connect</li>
+      <li>17. Roadmap por fases</li>
+      <li>18. Decisiones tomadas y riesgos abiertos</li>
+      <li>19. Control de cambios v1.2</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>1. Contexto, objetivo y alcance integrado</h2>
+    <p class="section-intro">HighNet es una empresa de reventas de tecnología que actualmente publica en su sitio web el catálogo del mayorista Syscom. Se incorpora un segundo mayorista, CT Internacional (CTOnline.mx), mediante su API CT-Connect. Esta versión 1.2 consolida en un solo diseño técnico la propuesta original del sitio y el ajuste posterior que introdujo comercialización configurable y panel administrativo.</p>
+    <h3>1.1 Qué problema se resuelve</h3>
+    <p>El objetivo no es simplemente sumar un segundo catálogo, sino construir una capa que permita <strong>comparar el mismo producto entre proveedores</strong>, elegir la mejor fuente por precio y calidad, y publicar en el sitio de HighNet un catálogo coherente que no dependa del dialecto ni de las reglas de negocio de cada mayorista.</p>
+    <p>El flujo comercial real que gobierna esta versión es:</p>
+    <div class="diagram">cliente pide en hnet.com.mx -> HighNet recibe pedido/cotización -> HighNet compra al mayorista -> HighNet envía</div>
+    <p>La v1.0 añadió una meta que sigue siendo válida y se conserva aquí como horizonte funcional: <strong>igualar las funciones relevantes del cotizador de Syscom</strong> (“Cotice a su Cliente”), incluyendo catálogo de marca blanca, mezcla de productos propios y de proveedor, subcuentas con márgenes independientes, e IVA/margen por categoría. La v1.1 cerró primero la parte indispensable para vender en el sitio público: precio público controlado por HighNet y administración de márgenes desde backend.</p>
+
+    <h3>1.2 Objetivo integrado v1.2</h3>
+    <ul>
+      <li>Una sola API interna consumida por el frontend público y por el panel admin.</li>
+      <li>Catálogo maestro unificado con dedupe, scoring de calidad y conservación de <code>sources[]</code>.</li>
+      <li>Precio público calculado por backend con porcentaje configurable, IVA, tipo de cambio y redondeo.</li>
+      <li>Separación estricta entre lo que ve el visitante (precio final) y lo que ve el admin (costos, fuente, reglas, preview).</li>
+      <li>Base de datos preparada tanto para el flujo actual de pedido web como para el cotizador interno/white-label documentado desde la v1.0.</li>
+    </ul>
+
+    <h3>1.3 Decisiones de producto (vigentes)</h3>
+    <table>
+      <tr><th>Tema</th><th>Decisión v1.2</th></tr>
+      <tr><td>Producto</td><td>Es el siguiente HighNet: el sitio deja de depender de rutas directas a proveedor como <code>/api/syscom</code>.</td></tr>
+      <tr><td>Audiencia del catálogo</td><td>Visitante y admin recorren el mismo catálogo y la misma ficha pública. El visitante no ve costos ni mayoristas.</td></tr>
+      <tr><td>Login</td><td>El sitio sigue siendo público. El acceso administrativo es discreto y solo agrega el menú <em>Administración</em> cuando el usuario tiene rol admin.</td></tr>
+      <tr><td>Precio público</td><td>Lo calcula el backend: costo MXN × (1 + margen) × (1 + IVA), con cascada producto -> categoría -> general.</td></tr>
+      <tr><td>Libertad del admin</td><td>Elige porcentajes y reglas; no reescribe el costo del mayorista ni expone el cálculo al visitante.</td></tr>
+      <tr><td>CT</td><td>Integración contra sandbox/documentación. El stock de venta se toma de Puebla (PUE), no de la suma nacional.</td></tr>
+      <tr><td>Pedidos a Syscom</td><td>Siguen siendo manuales en esta versión. El sistema arma la lista interna de compra.</td></tr>
+      <tr><td>Pedidos a CT</td><td>Quedan documentados para fase posterior vía API, con confirmación en 48 h.</td></tr>
+      <tr><td>Match</td><td>UPC/EAN idéntico = alta confianza. Marca canónica + modelo exacto = confianza media. Ante duda, no fusionar.</td></tr>
+      <tr><td>Cotizador interno</td><td>Se conserva como alcance futuro explícito: PDF marca blanca, subcuentas, márgenes por cliente y conversión a pedido.</td></tr>
+    </table>
+
+    <h3>1.4 Principio arquitectónico central</h3>
+    <p>El frontend de HighNet <strong>nunca consume las APIs de los proveedores directamente</strong>. Existe una sola API interna que consulta Syscom y CT, normaliza, fusiona, aplica reglas comerciales y devuelve contratos diferenciados para público y admin.</p>
+    <ul>
+      <li>Agregar un tercer proveedor no requiere tocar el frontend; solo se agrega un adaptador y mapeos.</li>
+      <li>Las reglas de margen, IVA, tipo de cambio, calidad y selección viven en backend/base de datos, no duplicadas en pantallas.</li>
+      <li>Si un proveedor falla, el backend degrada la respuesta de forma controlada en lugar de romper el sitio.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>2. Arquitectura general — actores y fronteras</h2>
+    <div class="diagram">Frontend público HighNet                 Panel Admin (rol admin)                 Cotizador interno (fase posterior)
+catálogo · detalle · carrito              márgenes · TC · preview · anomalías     PDF marca blanca · subcuentas · seguimiento
+                 \                          |                          /
+                  \                         |                         /
+                         API interna única (orquestador)
+              Adaptador Syscom   |   Adaptador CT-Connect
+                     \           |           /
+                   Normalizador + merge + calidad + dedupe
+                                 |
+                  Motor comercial (% + IVA + TC -> precio_venta)
+                                 |
+               Caché / BD maestro / precios_publicados / historial
+                                 |
+                           Syscom API · CT API</div>
+    <p class="small muted">Figura 1 — El frontend público, el panel admin y el cotizador interno futuro consumen el mismo núcleo orquestador con contratos distintos.</p>
+    <table>
+      <tr><th>Actor</th><th>Hace</th><th>No hace</th></tr>
+      <tr><td>Frontend público</td><td>Catálogo, detalle, buscador, carrito y pedido/cotización web. Muestra solo precio de venta y disponibilidad.</td><td>No conoce proveedores, no aplica porcentajes, no pide tipo de cambio, no multiplica costos.</td></tr>
+      <tr><td>Panel admin</td><td>Login, márgenes, IVA, TC, preview costo vs. venta, visibilidad, pedidos recibidos, anomalías y salud de proveedores.</td><td>No consulta APIs de mayoristas directamente ni modifica el costo fuente.</td></tr>
+      <tr><td>Cotizador interno (futuro, rescatado de v1.0)</td><td>Cliente/subcuenta, comparación de fuentes, PDF de marca blanca, seguimiento, conversión a pedido.</td><td>No reemplaza el pedido web actual; se documenta para que el esquema actual ya lo soporte.</td></tr>
+      <tr><td>Orquestador</td><td>Fan-out a adaptadores, fusión, cálculo comercial, persistencia y contratos.</td><td>No habla directamente el dialecto de negocio de un proveedor hacia el frontend.</td></tr>
+      <tr><td>Adaptadores Syscom / CT</td><td>Auth, paginación, reintentos, mapeo de campos; CT vende desde PUE.</td><td>No validan reglas de negocio ni aplican margen.</td></tr>
+      <tr><td>Normalizador</td><td>Limpia, valida, califica, enriquece, deduplica y conserva <code>sources[]</code>.</td><td>No elige el precio público ni colapsa el producto a un único proveedor.</td></tr>
+      <tr><td>Motor comercial</td><td>Resuelve margen, IVA, TC, redondeo y escribe <code>precios_publicados</code>.</td><td>No inventa costos ni hace dedupe.</td></tr>
+      <tr><td>BD / caché</td><td>Fuente de lectura del catálogo, historial, respaldo ante fallas y trazabilidad operativa.</td><td>No sustituye la consulta viva al confirmar un pedido.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. Flujo de consulta de catálogo y precio de venta</h2>
+    <div class="diagram">Frontend -> GET /api/products -> Orquestador
+                       -> lee precios_publicados / caché
+                        -> refresco puntual cuando aplica
+             Adaptadores Syscom + CT -> normalizador -> merge -> motor comercial</div>
+    <p class="small muted">Figura 2 — Navegación pública sobre precios ya calculados; consulta viva solo cuando el costo debe reconfirmarse.</p>
+    <table>
+      <tr><th>Escenario</th><th>Fuente</th><th>Razón</th></tr>
+      <tr><td>Navegar / buscar catálogo</td><td>BD / caché con <code>precio_venta</code></td><td>Respuesta instantánea; el porcentaje ya está aplicado.</td></tr>
+      <tr><td>Ver detalle</td><td>Caché + refresco puntual de ficha</td><td>El costo puede refrescarse por SKU si hay necesidad de exactitud.</td></tr>
+      <tr><td>Admin edita un %</td><td>Recálculo inmediato</td><td>El nuevo margen debe reflejarse sin esperar al job horario.</td></tr>
+      <tr><td>Confirmar pedido del sitio</td><td>Consulta viva de costo + % vigente</td><td>El precio obsoleto cuesta dinero real; se congelan costo, TC, margen e IVA.</td></tr>
+      <tr><td>Cotización interna futura</td><td>Caché + validación antes de convertir a pedido</td><td>Se preserva el congelado ya definido en la v1.0.</td></tr>
+    </table>
+
+    <h3>3.1 Cadena de cálculo</h3>
+    <ol>
+      <li>Los adaptadores traen costo original, moneda, stock y frescura. CT puede requerir conversión por tipo de cambio.</li>
+      <li>El normalizador deja <code>sources[]</code> con costos comparables en MXN y stock operativo (CT = PUE).</li>
+      <li>Para el catálogo público, se toma como costo de referencia la fuente con existencia y menor costo MXN.</li>
+      <li>Se aplica la cascada de margen, luego IVA, luego la política de redondeo.</li>
+      <li>Se escribe <code>precios_publicados.precio_venta</code>; eso es lo único que pinta el frontend público.</li>
+    </ol>
+    <p><strong>Fórmula base</strong>: <code>precio_venta = redondear(costo_mxn_elegido × (1 + margen) × (1 + iva))</code>.</p>
+    <div class="note">Migración inicial sugerida desde el <code>INCREMENTO = 1.25</code> actual: dejar <code>margen_general = 0.25</code> e <code>iva_default = 0.00</code> para no mover precios el día del corte, o desglosar después con una combinación equivalente.</div>
+  </section>
+
+  <section>
+    <h2>4. Flujo de resiliencia ante fallas</h2>
+    <div class="diagram">consulta paralela a adaptadores
+        v
+¿ambos fallaron?
+  |- no -> usar el disponible y marcar al caído
+  `- sí -> ¿hay caché vigente?
+           |- sí -> servir catálogo antiguo marcado como referencial
+           `- no -> error controlado</div>
+    <p class="small muted">Figura 3 — La caída de un proveedor nunca debe tumbar el catálogo completo.</p>
+    <table>
+      <tr><th>Regla</th><th>Detalle</th></tr>
+      <tr><td>Timeout por proveedor</td><td>4–6 s. Un proveedor lento se trata como caído.</td></tr>
+      <tr><td>Aislamiento</td><td>La excepción del adaptador produce resultado vacío marcado fallido; no tumba el orquestador.</td></tr>
+      <tr><td>Marcado</td><td>La respuesta admin sí muestra salud de proveedores; la pública evita nombrar mayoristas.</td></tr>
+      <tr><td>Reintento</td><td>Máximo dos, solo ante errores de red; nunca ante 401/403.</td></tr>
+      <tr><td>Caché</td><td>Una respuesta fallida jamás sobrescribe ficha ni precio vigentes.</td></tr>
+      <tr><td>CT stock</td><td>Si PUE falta o falla, esa fuente no cotiza existencia aunque otra sucursal tenga piezas.</td></tr>
+      <tr><td>Pedido / cotización</td><td>Antes de confirmar se vuelve a validar costo; la resiliencia del catálogo no sustituye la verificación comercial.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>5. Pipeline interno del normalizador</h2>
+    <div class="diagram">1. Mapeo al contrato -> 2. Limpieza correctiva -> 3. Validación bloqueante ->
+4. Scoring de completitud -> 5. Dedupe y merge -> 6. Motor comercial -> 7. Salida</div>
+    <p class="small muted">Figura 4 — El pipeline acumula marcas de calidad y sigue; solo las reglas bloqueantes detienen el producto.</p>
+    <table>
+      <tr><th>#</th><th>Etapa</th><th>Salida</th></tr>
+      <tr><td>1</td><td>Mapeo al contrato</td><td>Campos HighNet por fuente; <code>raw</code> íntegro.</td></tr>
+      <tr><td>2</td><td>Limpieza correctiva</td><td>Título, stock negativo -> 0, marca canónica, precio texto -> decimal, TC a MXN.</td></tr>
+      <tr><td>3</td><td>Validación bloqueante</td><td>SKU, precio &gt; 0, moneda, título >= 3; stock CT operativo = PUE.</td></tr>
+      <tr><td>4</td><td>Scoring de completitud</td><td>Ficha 0–100 por fuente (imagen, descripción, specs, etc.).</td></tr>
+      <tr><td>5</td><td>Dedupe y merge</td><td>UPC / marca+modelo. Conserva <code>sources[]</code>; no colapsa a un precio.</td></tr>
+      <tr><td>6</td><td>Motor comercial</td><td>Elige costo de referencia, aplica %, escribe <code>precio_venta</code>.</td></tr>
+      <tr><td>7</td><td>Salida</td><td>Contrato público (venta) y contrato admin (costos + preview).</td></tr>
+    </table>
+    <p>Principio operativo: un registro con varias advertencias se publica; uno con una sola regla bloqueante no. Ese comportamiento ya estaba en la v1.0 y se preserva en la v1.2 porque es fundamental para distinguir entre degradar y ocultar.</p>
+  </section>
+
+  <section>
+    <h2>6. Contratos de producto (público vs. admin)</h2>
+    <h3>6.1 Contrato público — lo que pinta el catálogo</h3>
+    <table>
+      <tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr>
+      <tr><td>id</td><td>string</td><td>Identificador interno HighNet, estable entre sincronizaciones.</td></tr>
+      <tr><td>sku</td><td>string</td><td>SKU canónico HighNet (marca + modelo), no el código de pedido al mayorista.</td></tr>
+      <tr><td>title / brand / model</td><td>string</td><td>Nombre comercial, marca canónica, modelo normalizado.</td></tr>
+      <tr><td>category</td><td>string</td><td>Taxonomía HighNet, no la del proveedor.</td></tr>
+      <tr><td>image / images</td><td>string / array</td><td>Portada y galería validadas.</td></tr>
+      <tr><td>description / features / specs</td><td>string / array / objeto</td><td>Ficha comercial unificada.</td></tr>
+      <tr><td>resources</td><td>array</td><td>Manuales, fichas PDF y enlaces del fabricante cuando sean públicos. Este campo aparece en la v1.0 y sigue siendo compatible con la separación público/admin.</td></tr>
+      <tr><td>available</td><td>boolean</td><td>Verdadero si la fuente de referencia tiene existencia vigente (CT = PUE).</td></tr>
+      <tr><td>price</td><td>number</td><td>Precio de venta final en MXN. Único precio visible en el sitio.</td></tr>
+      <tr><td>currency</td><td>string</td><td>Siempre MXN en catálogo público.</td></tr>
+      <tr><td>quality.flags</td><td>array</td><td>Solo banderas visibles al público, por ejemplo precio referencial por frescura.</td></tr>
+      <tr><td>lastSync</td><td>datetime</td><td>Frescura del dato publicado.</td></tr>
+    </table>
+
+    <h3>6.2 Contrato admin — costos, reglas y preview</h3>
+    <table>
+      <tr><th>Campo</th><th>Descripción</th></tr>
+      <tr><td>sources[]</td><td>Una entrada por proveedor: <code>provider</code>, <code>providerId</code>, costo original, moneda, costo MXN, TC, stock, <code>available</code>, <code>fieldsContributed</code> y <code>lastSync</code>.</td></tr>
+      <tr><td>costoReferencia</td><td>Costo MXN elegido para el cálculo público y el motivo (menor costo con stock).</td></tr>
+      <tr><td>reglaMargen</td><td>Origen (<em>producto | categoría | general</em>), porcentaje e id_regla.</td></tr>
+      <tr><td>iva</td><td>Porcentaje e id de origen.</td></tr>
+      <tr><td>preview</td><td><code>costo_mxn</code>, monto de ganancia, monto de IVA y precio de venta lado a lado.</td></tr>
+      <tr><td>raw</td><td>Payloads originales. Solo admin/auditoría; nunca viaja en listados públicos.</td></tr>
+      <tr><td>quality</td><td>Completitud, confianza del match, base del match, flags internas.</td></tr>
+    </table>
+
+    <h3>6.3 Trazabilidad del pedido</h3>
+    <p>El SKU canónico (<code>MERCUSYS-MR70X</code>) identifica el producto de catálogo. El código con el que HighNet compra al mayorista es <code>sources[].providerId</code>. Las líneas de pedido y cotización guardan ambos para evitar pérdida de rastreo operativo.</p>
+    <div class="note">La v1.0 documentó de forma explícita que <code>fieldsContributed</code> explica por qué un producto muestra cierta imagen, descripción o categoría sin tener que abrir <code>raw</code>. Esa trazabilidad se mantiene en v1.2 porque es útil para soporte, QA y auditoría comercial.</div>
+  </section>
+
+  <section>
+    <h2>7. Normas de calidad y severidades</h2>
+    <table>
+      <tr><th>Nivel</th><th>Qué provoca</th><th>Qué ve visitante/admin</th></tr>
+      <tr><td><strong>BLOQUEANTE</strong></td><td>No se publica. Cae en bandeja de anomalías.</td><td>No aparece en catálogo.</td></tr>
+      <tr><td><strong>CORRECTIVA</strong></td><td>Se corrige y continúa. Queda log.</td><td>Aparece normal.</td></tr>
+      <tr><td><strong>ADVERTENCIA</strong></td><td>Se publica marcado. Puede bajar visibilidad.</td><td>Visitante: distintivo suave si aplica. Admin: etiqueta completa.</td></tr>
+      <tr><td><strong>INFORMATIVA</strong></td><td>Solo auditoría.</td><td>Aparece normal.</td></tr>
+      <tr><td><strong>DISPONIBILIDAD</strong></td><td>No oculta el producto; fuerza <code>available = false</code>.</td><td>“Sobre pedido” o no comprable.</td></tr>
+    </table>
+    <p><strong>Regla de oro:</strong> bloquear solo lo que impide vender — no saber qué es, cuánto cuesta o cómo pedirlo.</p>
+
+    <h3>7.1 Reglas de validez</h3>
+    <table>
+      <tr><th>Regla</th><th>Severidad</th><th>Notas</th></tr>
+      <tr><td>sku / código de proveedor presente</td><td>BLOQUEANTE</td><td>Sin él no se puede levantar pedido al mayorista.</td></tr>
+      <tr><td>price numérico &gt; 0</td><td>BLOQUEANTE</td><td>Cero suele significar error de sync o producto no autorizado.</td></tr>
+      <tr><td>currency presente</td><td>BLOQUEANTE</td><td>Nunca asumir MXN; CT mezcla USD.</td></tr>
+      <tr><td>title >= 3 caracteres</td><td>BLOQUEANTE</td><td>Sin nombre no hay catálogo ni búsqueda.</td></tr>
+      <tr><td>stock negativo</td><td>CORRECTIVA</td><td>Se fuerza a 0.</td></tr>
+      <tr><td>price como texto</td><td>CORRECTIVA</td><td>Se limpian separadores y símbolos.</td></tr>
+      <tr><td>available contradice stock</td><td>CORRECTIVA</td><td>Gana stock; en CT el stock operativo es PUE.</td></tr>
+      <tr><td>precio fuera de rango</td><td>ADVERTENCIA</td><td>Patrón típico de decimal o TC mal aplicado.</td></tr>
+    </table>
+
+    <h3>7.2 Completitud, consistencia y frescura</h3>
+    <table>
+      <tr><th>Regla</th><th>Severidad</th><th>Notas</th></tr>
+      <tr><td>Sin image / description / brand / category</td><td>ADVERTENCIA</td><td>Se enriquece del otro proveedor cuando hay match; sin categoría hereda margen general.</td></tr>
+      <tr><td>Sin specs o features</td><td>INFORMATIVA</td><td>Afecta enriquecimiento, no la venta.</td></tr>
+      <tr><td>Marca no canónica</td><td>CORRECTIVA</td><td>Se resuelve contra tabla de sinónimos.</td></tr>
+      <tr><td>Categoría sin mapeo</td><td>ADVERTENCIA</td><td>Pasa a “Sin clasificar” y a la bandeja.</td></tr>
+      <tr><td>Discrepancia de costo &gt; 40 %</td><td>ADVERTENCIA</td><td>Posible mal match; se evita auto-selección.</td></tr>
+      <tr><td>URL de imagen rota</td><td>CORRECTIVA</td><td>Se usa el siguiente candidato.</td></tr>
+      <tr><td>lastSync &gt; 6 h</td><td>ADVERTENCIA</td><td>Precio referencial; sigue cotizable.</td></tr>
+      <tr><td>lastSync &gt; 72 h</td><td>DISPONIBILIDAD</td><td><code>available = false</code>; el stock viejo no vende.</td></tr>
+    </table>
+
+    <h3>7.3 Confianza del match</h3>
+    <table>
+      <tr><th>Nivel</th><th>Criterio</th><th>Acción</th></tr>
+      <tr><td>Alta</td><td>UPC o EAN idéntico</td><td>Fusionar automáticamente.</td></tr>
+      <tr><td>Media</td><td>Marca canónica + modelo exacto</td><td>Fusionar automáticamente.</td></tr>
+      <tr><td>Baja</td><td>Solo similitud de título o descripción</td><td>No fusionar; sugerencia a bandeja.</td></tr>
+    </table>
+    <p>Ante la duda en el merge: es preferible un duplicado visible que dos productos distintos fusionados por error.</p>
+  </section>
+
+  <section>
+    <h2>8. Traza completa de ejemplo</h2>
+    <p>Se sigue el recorrido de dos productos ficticios. El Producto A existe en ambos proveedores; el Producto B solo en CT y llega con datos sucios. En v1.2 se conserva el ajuste de la v1.1: el stock operativo de CT es Puebla y el precio público lo calcula el motor comercial.</p>
+    <h3>8.1 Crudo (resumen)</h3>
+    <table>
+      <tr><th>Campo</th><th>A / Syscom</th><th>A / CT</th><th>B / CT</th></tr>
+      <tr><td>id proveedor</td><td>128374</td><td>REDMER0018</td><td>ACCNOB0091</td></tr>
+      <tr><td>título</td><td>ROUTER… MR70X (HTML)</td><td>MERCUSYS MR70X…</td><td>BASE ENFRIADORA…</td></tr>
+      <tr><td>marca</td><td>MERCUSYS</td><td>Mercusys</td><td>(vacío)</td></tr>
+      <tr><td>precio</td><td>1150.00 MXN</td><td>62.30 USD</td><td>0.00 MXN</td></tr>
+      <tr><td>stock</td><td>14 (total)</td><td>PUE 8 / MEX 25</td><td>PUE -3</td></tr>
+      <tr><td>UPC</td><td>6957939001234</td><td>6957939001234</td><td>null</td></tr>
+      <tr><td>TC</td><td>—</td><td>18.40</td><td>—</td></tr>
+    </table>
+
+    <h3>8.2 Limpieza y validación</h3>
+    <ul>
+      <li><strong>A / Syscom</strong>: título limpio, precio decimal 1150.00 MXN, stock 14, marca canónica Mercusys. Pasa.</li>
+      <li><strong>A / CT</strong>: 62.30 × 18.40 = 1146.32 MXN; stock operativo = 8 (PUE), no 33. Pasa.</li>
+      <li><strong>B / CT</strong>: precio 0 -> <strong>RECHAZADO</strong>; stock -3 -> 0; quedan registradas advertencias de marca/categoría/imagen.</li>
+    </ul>
+
+    <h3>8.3 Merge de A</h3>
+    <p>UPC idéntico -> confianza alta. La ficha (título, imagen, specs, categoría) la gana Syscom por completitud; los costos se conservan en <code>sources[]</code>. La discrepancia 1150.00 vs 1146.32 es de 0.3 %, muy por debajo del umbral del 40 %.</p>
+    <table>
+      <tr><th>Campo</th><th>Gana</th><th>Razón</th></tr>
+      <tr><td>title, description, images, specs, features, category</td><td>Syscom</td><td>Mayor completitud de ficha.</td></tr>
+      <tr><td>brand, model</td><td>Ambos coinciden</td><td>Ya canónicos tras limpieza.</td></tr>
+      <tr><td>price, stock, available</td><td>Ninguno</td><td>Se conservan ambos como insumo del motor de selección.</td></tr>
+    </table>
+
+    <h3>8.4 Motor comercial sobre A</h3>
+    <table>
+      <tr><th>Paso</th><th>Valor</th></tr>
+      <tr><td>Fuentes con stock</td><td>Syscom 14 @ 1150.00 · CT PUE 8 @ 1146.32</td></tr>
+      <tr><td>Costo de referencia</td><td>1146.32 MXN (CT, menor costo con existencia)</td></tr>
+      <tr><td>Regla de margen</td><td>General 25 % (sin override de producto/categoría en el ejemplo)</td></tr>
+      <tr><td>IVA</td><td>0 % (modo migración equivalente a INCREMENTO 1.25)</td></tr>
+      <tr><td>Precio de venta público</td><td><strong>1432.90 MXN</strong></td></tr>
+      <tr><td>Qué ve el visitante</td><td>Router… $1,432.90 · disponible</td></tr>
+      <tr><td>Qué ve el admin</td><td>Costo CT 1,146.32 vs Syscom 1,150.00 · % 25 · preview 1,432.90 · fuente CT PUE</td></tr>
+    </table>
+    <p>Si el admin sube <em>Networking &gt; Routers</em> a 30 %, el recálculo cambia el precio público a 1490.22 sin tocar código. Si coloca un override del 10 % para ese SKU, gana el override.</p>
+
+    <h3>8.5 Lecciones que se preservan desde la v1.0</h3>
+    <ol>
+      <li><code>sources[]</code> es un arreglo, no un ganador; el normalizador no elige proveedor.</li>
+      <li><code>fieldsContributed</code> es la trazabilidad operativa de la ficha final.</li>
+      <li><code>quality.flags</code> viaja al frontend como mecanismo de degradación visible sin perder el producto.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>9. Tabla de sinónimos de marca</h2>
+    <p>Trabajo manual inicial que hace funcionar la regla correctiva de marca. Antes de consultar <code>marca_sinonimos</code>, el normalizador convierte a minúsculas, recorta espacios, colapsa duplicados, quita puntuación, acentos y sufijos societarios (<em>Inc., Corp., S.A. de C.V., Ltd., Technologies</em>, etc.) para reducir variantes a registrar.</p>
+    <table>
+      <tr><th>Canónico</th><th>Variantes</th><th>Notas</th></tr>
+      <tr><td>Hewlett Packard</td><td>HP, H.P., HP Inc., Hewlett-Packard</td><td>Separar de HPE.</td></tr>
+      <tr><td>HPE</td><td>HP Enterprise, Aruba HPE</td><td>Línea empresarial.</td></tr>
+      <tr><td>TP-Link</td><td>TPLINK, TP LINK, TP-LINK TECHNOLOGIES</td><td>Guion en el canónico.</td></tr>
+      <tr><td>Mercusys</td><td>MERCUSYS, Mercusys by TP-Link</td><td>No fusionar con TP-Link.</td></tr>
+      <tr><td>Hikvision</td><td>HIKVISION, Hik Vision, HIK</td><td>—</td></tr>
+      <tr><td>Epcom</td><td>EPCOM, Epcom Powerline</td><td>Marca propia Syscom.</td></tr>
+      <tr><td>Ubiquiti</td><td>UBIQUITI, UBNT, Ubiquiti Networks</td><td>—</td></tr>
+      <tr><td>APC</td><td>APC by Schneider, Schneider APC</td><td>Conservar APC.</td></tr>
+      <tr><td>Adata</td><td>A-DATA, XPG Adata</td><td>Evaluar submarca XPG.</td></tr>
+      <tr><td>Sin marca</td><td>vacío, N/A, GENERICO, OEM</td><td>Inhabilita match medio por marca+modelo.</td></tr>
+    </table>
+    <p>Si llega una marca desconocida, se conserva tal cual, se publica con advertencia y se registra como candidata en bandeja. La lista base de la v1.0 se mantiene como seed para la tabla.</p>
+  </section>
+
+  <section>
+    <h2>10. Mapeo de categorías</h2>
+    <p>Cada proveedor tiene su propia taxonomía. HighNet mantiene la suya; márgenes e IVA se aplican siempre sobre la taxonomía HighNet. Sin categoría -> <em>Sin clasificar</em> -> margen general.</p>
+    <h3>10.1 Taxonomía HighNet</h3>
+    <table>
+      <tr><th>Categoría</th><th>Subcategorías</th></tr>
+      <tr><td>Networking</td><td>Routers, Switches, Access Points, Antenas y enlaces, Cableado estructurado, Accesorios de red</td></tr>
+      <tr><td>Videovigilancia</td><td>Cámaras IP, analógicas, NVR y DVR, Almacenamiento CCTV, Accesorios</td></tr>
+      <tr><td>Cómputo</td><td>Laptops, Escritorio, All-in-One, Workstations, Tablets</td></tr>
+      <tr><td>Componentes</td><td>Almacenamiento, Memorias, Procesadores, GPU, Fuentes, Gabinetes, Tarjetas madre</td></tr>
+      <tr><td>Periféricos</td><td>Monitores, Teclados y mouse, Audio, Webcams, Accesorios</td></tr>
+      <tr><td>Impresión</td><td>Impresoras, Multifuncionales, Escáneres, Consumibles, Plotters</td></tr>
+      <tr><td>Energía</td><td>UPS, Reguladores, Supresores, Baterías, Solar</td></tr>
+      <tr><td>Telefonía IP</td><td>Teléfonos IP, PBX, Diademas, Gateways</td></tr>
+      <tr><td>Control de acceso</td><td>Biométricos, Cerraduras, Torniquetes, Barreras</td></tr>
+      <tr><td>Servidores y Datacenter</td><td>Servidores, Racks, Almacenamiento empresarial, KVM</td></tr>
+      <tr><td>Punto de venta</td><td>Terminales, Tickets, Lectores, Cajones</td></tr>
+      <tr><td>Software y licencias</td><td>SO, Antivirus, Ofimática, Nube</td></tr>
+      <tr><td>Servicios HighNet</td><td>Instalación, Soporte, Pólizas, Capacitación</td></tr>
+      <tr><td>Sin clasificar</td><td>Temporal. Hereda margen general.</td></tr>
+    </table>
+    <h3>10.2 Mapeo y palabras clave</h3>
+    <table>
+      <tr><th>Origen CT</th><th>Palabra en título</th><th>Destino HighNet</th></tr>
+      <tr><td>Conectividad</td><td>router, ruteador</td><td>Networking &gt; Routers</td></tr>
+      <tr><td>Conectividad</td><td>switch, conmutador</td><td>Networking &gt; Switches</td></tr>
+      <tr><td>Conectividad</td><td>access point, ap, repetidor</td><td>Networking &gt; Access Points</td></tr>
+      <tr><td>Conectividad</td><td>cable, patch cord, jack</td><td>Networking &gt; Cableado estructurado</td></tr>
+      <tr><td>Conectividad</td><td>sin coincidencia</td><td>Networking &gt; Accesorios de red</td></tr>
+    </table>
+    <p>Syscom suele mapear casi 1:1; CT trae ramas más anchas. Por eso se conserva la lógica de <code>categoria_reglas_palabra</code> documentada desde la v1.0.</p>
+  </section>
+
+  <section>
+    <h2>11. Comercialización: porcentajes, IVA, tipo de cambio y panel admin</h2>
+    <h3>11.1 Libertad del administrador</h3>
+    <p>El admin no captura el precio de góndola peso a peso. Configura porcentajes y el sistema calcula el precio de venta.</p>
+    <table>
+      <tr><th>Nivel</th><th>Cuándo aplica</th><th>Ejemplo</th></tr>
+      <tr><td>Producto</td><td>Existe fila activa en <code>reglas_margen_producto</code> para ese SKU.</td><td>Este UPS se vende con 18 % aunque Energía tenga 22 %.</td></tr>
+      <tr><td>Categoría</td><td>No hay override de SKU; se usa <code>reglas_margen_categoria</code>.</td><td>Networking &gt; Routers = 28 %.</td></tr>
+      <tr><td>General</td><td>No hay regla más específica.</td><td><code>configuracion_comercial.margen_general</code> = 25 %.</td></tr>
+    </table>
+
+    <h3>11.2 IVA y redondeo</h3>
+    <p><code>iva_default</code> vive en configuración (recomendado a futuro: 0.16). Una categoría puede tener <code>iva_porcentaje</code> propio. El catálogo público puede mostrar precio con IVA incluido; el pedido interno y el cotizador podrán desglosarlo. El redondeo por defecto es a 2 decimales, con opción a peso entero hacia arriba.</p>
+
+    <h3>11.3 Tipo de cambio</h3>
+    <ul>
+      <li>Cada fuente guarda precio original, moneda y TC aplicado. Nunca se mezcla el TC de un proveedor con el costo del otro.</li>
+      <li>Modo automático: el job toma el TC documentado por CT para líneas CT; Syscom se trata como MXN salvo evidencia contraria.</li>
+      <li>Modo manual: el admin fija un valor vigente. Debe quedar auditoría (quién, cuándo, valor anterior).</li>
+      <li>Un TC erróneo puede subcotizar servidores; el panel debe mostrar origen, fecha y valor.</li>
+    </ul>
+
+    <h3>11.4 Interfaz de administración</h3>
+    <p>El sitio permanece público. El login vive en un acceso discreto; si <code>rol = admin</code> y <code>activo = true</code>, el menú global muestra <em>Administración</em> -> <code>/admin</code>. El panel 3.0 existente (banners, cotizaciones web, pedidos, usuarios) se conserva y se amplía con:</p>
+    <table>
+      <tr><th>Pantalla</th><th>Capacidad</th></tr>
+      <tr><td>Tipo de cambio</td><td>Valor vigente, origen auto/manual, override e historial.</td></tr>
+      <tr><td>Configuración comercial</td><td>Margen general, IVA default, modo de redondeo, almacén CT de venta (PUE).</td></tr>
+      <tr><td>Márgenes por categoría</td><td>Tabla editable con preview de costo -> precio de venta.</td></tr>
+      <tr><td>Productos</td><td>Búsqueda por SKU; ver costos, regla aplicada, preview y ocultar/mostrar.</td></tr>
+      <tr><td>Pedidos del sitio</td><td>Flujo existente enriquecido con costo congelado y fuente interna.</td></tr>
+      <tr><td>Anomalías</td><td>Rechazos, marcas/categorías por mapear, discrepancias de costo.</td></tr>
+      <tr><td>Salud de proveedores</td><td>Respondiendo / degradado / caído.</td></tr>
+    </table>
+
+    <h3>11.5 Recálculo</h3>
+    <table>
+      <tr><th>Evento</th><th>Alcance del recálculo</th></tr>
+      <tr><td>Sync horario de costos</td><td>Todos los SKUs tocados por la sincronización.</td></tr>
+      <tr><td>Cambio de margen general o IVA default</td><td>Todo el catálogo publicado (job asíncrono).</td></tr>
+      <tr><td>Cambio de % de una categoría</td><td>Productos de esa categoría y descendientes sin override de SKU.</td></tr>
+      <tr><td>Override o borrado de override SKU</td><td>Ese producto.</td></tr>
+      <tr><td>Cambio de TC manual</td><td>Fuentes en moneda extranjera y sus precios publicados.</td></tr>
+      <tr><td>Producto rechazado por calidad</td><td>No se publica / se retira <code>precio_venta</code> activo.</td></tr>
+    </table>
+    <div class="note warning">Seguridad: <code>/api/admin/*</code> y <code>/api/auth/*</code> van con JWT. El contrato público jamás incluye <code>sources</code>, <code>raw</code> ni costos. El primer admin se crea por seed, no por formulario público.</div>
+  </section>
+
+  <section class="page-break">
+    <h2>12. Diseño final de la base de datos</h2>
+    <p>Motor: <strong>MySQL</strong> (el sitio 3.0 ya usa Sequelize + MySQL). Se conservan las tablas operativas existentes y se agregan dominios de catálogo, calidad y comercialización. La v1.2 mantiene además las tablas de expansión necesarias para el cotizador interno descrito originalmente en la v1.0.</p>
+
+    <h3>12.1 Mapa de dominios</h3>
+    <table>
+      <tr><th>Dominio</th><th>Tablas</th><th>Quién escribe</th></tr>
+      <tr><td>Identidad y sitio</td><td>users, addresses, banners, coupons</td><td>Auth, panel, clientes</td></tr>
+      <tr><td>Pedido web</td><td>orders, order_items</td><td>Checkout público + admin</td></tr>
+      <tr><td>Cotización web</td><td>quotes</td><td>Sitio + admin</td></tr>
+      <tr><td>Proveedores</td><td>proveedores, proveedor_credenciales, proveedor_salud</td><td>Ops / adaptadores</td></tr>
+      <tr><td>Catálogo maestro</td><td>productos_maestro, producto_medios, fuentes_proveedor, fuente_almacenes, historial_precios_fuente</td><td>Sync / normalizador</td></tr>
+      <tr><td>Taxonomía</td><td>categorias, marcas, marca_sinonimos, categoria_mapeo, categoria_reglas_palabra</td><td>Admin + seed</td></tr>
+      <tr><td>Calidad</td><td>reglas_calidad, evaluaciones_calidad, anomalias, matches_producto, sync_ejecuciones</td><td>Normalizador + admin</td></tr>
+      <tr><td>Comercialización</td><td>configuracion_comercial, tipo_cambio, reglas_margen_categoria, reglas_margen_producto, precios_publicados, historial_precios_publicados, auditoria_comercial</td><td>Admin + motor comercial</td></tr>
+      <tr><td>Compra a mayorista</td><td>pedidos_proveedor, pedido_lineas</td><td>Ops</td></tr>
+      <tr><td>Cotizador interno (fase posterior)</td><td>cotizaciones, cotizacion_lineas, clientes, subcuentas, reglas_comercializacion, eventos_calidad_proveedor, scores_calidad_proveedor</td><td>Vendedores / compras</td></tr>
+    </table>
+
+    <h3>12.2 Identidad y sitio (se conservan)</h3>
+    <table>
+      <tr><th>Tabla</th><th>Columnas principales</th><th>Notas</th></tr>
+      <tr><td>users</td><td>user_id, nombre, email, password, telefono, rol, activo, created_at, updated_at</td><td><code>rol = admin</code> habilita menú Administración. Password con bcrypt.</td></tr>
+      <tr><td>addresses</td><td>campos de envío</td><td>Sin cambio de propósito.</td></tr>
+      <tr><td>banners</td><td>home/promociones</td><td>Se conservan.</td></tr>
+      <tr><td>coupons</td><td>código, monto/porcentaje, vigencia, usos</td><td>Se deja preparada la futura relación con orders.</td></tr>
+    </table>
+
+    <h3>12.3 Pedido del sitio (cliente -> HighNet)</h3>
+    <table>
+      <tr><th>Tabla</th><th>Columnas principales</th><th>Notas</th></tr>
+      <tr><td>orders</td><td>order_id, user_id, subtotal, impuestos, envio, total, status, metodo_pago, reference_pago, direccion_envio, notas, fecha_pago, fecha_envio, fecha_entrega, tipo_cambio_congelado</td><td>Precios de venta, no costos. Permite invitado si el checkout no exige cuenta.</td></tr>
+      <tr><td>order_items</td><td>item_id, order_id, id_producto, id_fuente, sku_proveedor, titulo, img_portada, cantidad, precio_unitario, precio_costo_congelado, moneda_costo, tipo_cambio_congelado, margen_aplicado, iva_aplicado, regla_margen_origen</td><td>Conserva snapshot visual, costo, fuente y regla aplicada.</td></tr>
+      <tr><td>quotes</td><td>formulario actual del sitio</td><td>Se mantiene para leads; no sustituye el cotizador de marca blanca.</td></tr>
+    </table>
+
+    <h3>12.4 Proveedores</h3>
+    <table>
+      <tr><th>Tabla</th><th>Columnas principales</th><th>Notas</th></tr>
+      <tr><td>proveedores</td><td>id_proveedor, nombre, clave, tipo_autenticacion, url_base, activo, prioridad_ficha, timeout_ms, almacen_venta_default</td><td>Seed: syscom, ct. CT = PUE.</td></tr>
+      <tr><td>proveedor_credenciales</td><td>id_credencial, id_proveedor, ambiente, datos_cifrados, token_vigente, expira_en</td><td>Email, cliente, RFC y tokens; nunca en logs.</td></tr>
+      <tr><td>proveedor_salud</td><td>id_salud, id_proveedor, estado, latencia_ms, mensaje, checked_at</td><td>Último probe.</td></tr>
+    </table>
+
+    <h3>12.5 Catálogo maestro</h3>
+    <table>
+      <tr><th>Tabla</th><th>Columnas principales</th><th>Notas</th></tr>
+      <tr><td>productos_maestro</td><td>id_producto, sku_canonico, nombre_comercial, descripcion, id_categoria, id_marca, modelo, upc, ean, es_producto_propio, visible, created_at, updated_at</td><td>ID estable; visible permite soft hide.</td></tr>
+      <tr><td>producto_medios</td><td>id_medio, id_producto, tipo, url, orden, id_proveedor_origen, validada</td><td>Trazabilidad de imagen/ficha/manual.</td></tr>
+      <tr><td>fuentes_proveedor</td><td>id_fuente, id_producto, id_proveedor, sku_proveedor, precio_costo, moneda, precio_mxn, tipo_cambio, existencia, tiempo_entrega_dias, activa, fecha_ultima_sync</td><td>Para CT, <code>existencia</code> = PUE.</td></tr>
+      <tr><td>fuente_almacenes</td><td>id_fuente_almacen, id_fuente, clave_almacen, existencia</td><td>Guarda el desglose real; útil para auditoría y logística.</td></tr>
+      <tr><td>historial_precios_fuente</td><td>id_historial, id_fuente, precio_costo, moneda, precio_mxn, existencia, fecha_registro</td><td>Solo inserción.</td></tr>
+    </table>
+
+    <h3>12.6 Taxonomía y normalización</h3>
+    <table>
+      <tr><th>Tabla</th><th>Columnas principales</th></tr>
+      <tr><td>categorias</td><td>id_categoria, nombre, id_categoria_padre, slug, activa, iva_porcentaje</td></tr>
+      <tr><td>marcas</td><td>id_marca, nombre_canonico, activa, permite_match_por_modelo</td></tr>
+      <tr><td>marca_sinonimos</td><td>id_sinonimo, id_marca, variante, origen, confirmada</td></tr>
+      <tr><td>categoria_mapeo</td><td>id_mapeo, id_proveedor, categoria_origen, id_categoria_destino, confirmada</td></tr>
+      <tr><td>categoria_reglas_palabra</td><td>id_regla, id_mapeo, palabra_clave, id_categoria_destino, orden_evaluacion</td></tr>
+    </table>
+
+    <h3>12.7 Calidad de dato</h3>
+    <table>
+      <tr><th>Tabla</th><th>Columnas principales</th></tr>
+      <tr><td>reglas_calidad</td><td>id_regla, clave, descripcion, severidad, accion, parametros JSON, id_proveedor, activa</td></tr>
+      <tr><td>evaluaciones_calidad</td><td>id_evaluacion, id_fuente, id_regla, resultado, valor_original, valor_corregido, fecha</td></tr>
+      <tr><td>anomalias</td><td>id_anomalia, id_proveedor, sku_proveedor, tipo, severidad, detalle, estado, fecha_deteccion, id_usuario_revisor</td></tr>
+      <tr><td>matches_producto</td><td>id_match, id_producto, id_fuente_a, id_fuente_b, nivel_confianza, criterio, fusionado, confirmado_por_humano</td></tr>
+      <tr><td>sync_ejecuciones</td><td>id_ejecucion, id_proveedor, inicio, fin, estado, registros_recibidos, publicados, rechazados, mensaje_error</td></tr>
+    </table>
+    <p><code>reglas_calidad</code> sigue siendo tabla y no código para cambiar umbrales o apagar reglas por proveedor sin desplegar.</p>
+
+    <h3>12.8 Comercialización (núcleo nuevo en v1.1)</h3>
+    <table>
+      <tr><th>Tabla</th><th>Columnas principales</th><th>Notas</th></tr>
+      <tr><td>configuracion_comercial</td><td>id_config, margen_general, iva_default, modo_redondeo, modo_tipo_cambio, almacen_ct_venta, modo_seleccion_costo, updated_by, updated_at</td><td>Una fila vigente.</td></tr>
+      <tr><td>tipo_cambio</td><td>id_tipo_cambio, fuente, valor, vigente, id_usuario, created_at</td><td>Historial completo de auto/manual.</td></tr>
+      <tr><td>reglas_margen_categoria</td><td>id_regla, id_categoria, margen_porcentaje, iva_porcentaje, activa, updated_by, updated_at</td><td>Una activa por categoría.</td></tr>
+      <tr><td>reglas_margen_producto</td><td>id_regla, id_producto, margen_porcentaje, activa, updated_by, updated_at</td><td>Override por SKU.</td></tr>
+      <tr><td>precios_publicados</td><td>id_precio, id_producto, id_fuente_elegida, precio_costo_mxn, margen_aplicado, origen_margen, iva_aplicado, precio_venta, moneda, available, fecha_calculo, id_ejecucion_sync</td><td>Lo que lee el frontend público.</td></tr>
+      <tr><td>historial_precios_publicados</td><td>id_producto, precio_venta, costo, margen, iva, origen, fecha</td><td>Permite auditar el efecto de un cambio.</td></tr>
+      <tr><td>auditoria_comercial</td><td>id_audit, id_usuario, entidad, id_entidad, valor_anterior JSON, valor_nuevo JSON, created_at</td><td>Obligatoria en TC manual y márgenes.</td></tr>
+    </table>
+
+    <h3>12.9 Compra a mayorista (interno)</h3>
+    <table>
+      <tr><th>Tabla</th><th>Columnas principales</th><th>Notas</th></tr>
+      <tr><td>pedidos_proveedor</td><td>id_pedido_proveedor, id_order, id_proveedor, folio_externo, estatus, canal, fecha_solicitud, fecha_confirmacion, fecha_limite_confirmacion</td><td>Syscom: manual. CT: API en fase posterior.</td></tr>
+      <tr><td>pedido_lineas</td><td>id_pedido_linea, id_pedido_proveedor, id_order_item, sku_proveedor, cantidad, precio_confirmado</td><td>Trazabilidad entre pedido público y compra interna.</td></tr>
+    </table>
+
+    <h3>12.10 Tablas de expansión futura (rescatadas y preservadas)</h3>
+    <table>
+      <tr><th>Tabla</th><th>Para qué más adelante</th></tr>
+      <tr><td>clientes / subcuentas</td><td>Márgenes por cliente o vendedor; cotizador de marca blanca.</td></tr>
+      <tr><td>reglas_comercializacion</td><td>Peso precio, peso calidad, umbral de empate, modo de selección por categoría/cliente/subcuenta.</td></tr>
+      <tr><td>eventos_calidad_proveedor / scores_calidad_proveedor</td><td>Score con decaimiento basado en entrega, incidencias, garantía y nota de compras.</td></tr>
+      <tr><td>cotizaciones / cotizacion_lineas</td><td>PDF HighNet, vigencia, congelado de líneas, seguimiento, distinto del formulario <code>quotes</code>.</td></tr>
+    </table>
+
+    <h3>12.11 Índices e integridad</h3>
+    <p>Índices esenciales: <code>productos_maestro(sku_canonico)</code> unique; índices por categoría, marca y UPC; <code>fuentes_proveedor(id_proveedor, sku_proveedor)</code> unique; índices de frescura, anomalías y relación de pedido. Reglas de escritura: borrado soft de producto; tablas <code>historial_*</code> solo INSERT; <code>precios_publicados</code> por UPSERT; credenciales cifradas en reposo.</p>
+
+    <h3>12.12 Cómo el esquema soporta expansión</h3>
+    <table>
+      <tr><th>Escenario</th><th>Qué se toca</th></tr>
+      <tr><td>Tercer mayorista</td><td>Fila en proveedores, adaptador, mapeos de categoría; frontend igual.</td></tr>
+      <tr><td>Admin cambia % de Routers</td><td>UPDATE en reglas_margen_categoria + recálculo de <code>precios_publicados</code>.</td></tr>
+      <tr><td>Admin fija TC</td><td>INSERT en tipo_cambio + auditoría + recálculo de fuentes USD.</td></tr>
+      <tr><td>Producto propio HighNet</td><td><code>productos_maestro.es_producto_propio = 1</code>, sin fuentes_proveedor.</td></tr>
+      <tr><td>Cliente con lista propia</td><td>Uso posterior de <code>reglas_comercializacion</code>; el catálogo público sigue con la cascada actual.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>13. Motor de selección de proveedor y score de calidad</h2>
+    <p>El catálogo público de esta versión usa una regla simple: <strong>menor costo MXN con existencia</strong> (CT = PUE). El score de calidad del proveedor permanece documentado para la fase posterior y para no cerrar en falso el diseño de datos ya incorporado desde la v1.0.</p>
+    <h3>13.1 Fórmula futura</h3>
+    <p><code>score_fuente = (peso_precio × score_precio_normalizado) + (peso_calidad × score_calidad_proveedor)</code></p>
+    <ul>
+      <li>Los pesos son configurables por categoría: un cable se decide casi solo por precio; un servidor o UPS pondera mucho más la calidad/garantía.</li>
+      <li>Las fuentes sin existencia se descartan antes del cálculo.</li>
+      <li>Empate dentro del umbral -> decisión humana con explicación.</li>
+    </ul>
+    <h3>13.2 Modos</h3>
+    <table>
+      <tr><th>Modo</th><th>Uso</th></tr>
+      <tr><td>Automático</td><td>Elige sin preguntar cuando haya historial suficiente.</td></tr>
+      <tr><td>Sugerido</td><td>Preselecciona y muestra alternativas. Modo inicial recomendado.</td></tr>
+      <tr><td>Manual</td><td>Solo tabla comparativa. Útil para productos críticos o de alto valor.</td></tr>
+    </table>
+    <h3>13.3 Componentes del score</h3>
+    <table>
+      <tr><th>Componente</th><th>Peso inicial</th><th>Fuente del dato</th></tr>
+      <tr><td>Cumplimiento de entrega</td><td>30 %</td><td>Fecha prometida vs. fecha real de pedidos históricos.</td></tr>
+      <tr><td>Tasa de incidencias</td><td>30 %</td><td>Garantías, devoluciones y daños.</td></tr>
+      <tr><td>Garantía ofrecida</td><td>20 %</td><td>Meses de garantía del catálogo, normalizados.</td></tr>
+      <tr><td>Evaluación manual</td><td>20 %</td><td>Nota del equipo de compras.</td></tr>
+    </table>
+    <p>Niveles: proveedor+marca, luego proveedor+categoría, luego proveedor general. Decaimiento temporal sugerido: ~6 meses. Arranque en frío: menos de 10 entregas -> solo evaluación manual, marcado <em>preliminar</em>.</p>
+  </section>
+
+  <section>
+    <h2>14. Flujo de pedido en sitio y cotización</h2>
+    <h3>14.1 Pedido del sitio (flujo actual)</h3>
+    <table>
+      <tr><th>Paso</th><th>Detalle</th></tr>
+      <tr><td>1. Catálogo</td><td>El cliente ve <code>precio_venta</code>. No ve costo ni mayorista.</td></tr>
+      <tr><td>2. Carrito</td><td>Líneas con precio de venta vigente.</td></tr>
+      <tr><td>3. Confirmación</td><td>Consulta viva de costo. Si el delta con lo mostrado supera el umbral, se avisa o se bloquea; nunca se cambia el total en silencio.</td></tr>
+      <tr><td>4. Congelado</td><td>Cada <code>order_item</code> guarda costo, TC, margen, IVA, id_fuente y sku_proveedor.</td></tr>
+      <tr><td>5. HighNet compra</td><td>Se generan <code>pedidos_proveedor</code> agrupados. Syscom = manual; CT = API en fase posterior.</td></tr>
+      <tr><td>6. Envío</td><td>HighNet cumple al cliente y el order público refleja estatus.</td></tr>
+    </table>
+
+    <h3>14.2 Cotizador interno / marca blanca (contenido reintegrado de la v1.0)</h3>
+    <p>La v1.1 lo redujo a “fase posterior”; la v1.2 conserva el detalle funcional de la propuesta original para que no se pierda el objetivo de negocio.</p>
+    <table>
+      <tr><th>Paso</th><th>Etapa</th><th>Detalle</th></tr>
+      <tr><td>1</td><td>Inicio</td><td>El vendedor selecciona o crea cliente y subcuenta; eso determina reglas de margen.</td></tr>
+      <tr><td>2</td><td>Búsqueda</td><td>Siempre sobre el catálogo maestro unificado, nunca por proveedor.</td></tr>
+      <tr><td>3</td><td>Resolución de fuentes</td><td>Se traen las fuentes con existencia y se calcula o muestra su score comparativo.</td></tr>
+      <tr><td>4</td><td>Presentación</td><td>Modo automático/sugerido/manual según categoría o cliente.</td></tr>
+      <tr><td>5</td><td>Margen e IVA</td><td>Orden: margen de cliente o subcuenta, luego categoría, luego IVA. Puede existir ajuste manual auditado.</td></tr>
+      <tr><td>6</td><td>Más líneas</td><td>Pueden convivir distintos proveedores y productos propios.</td></tr>
+      <tr><td>7</td><td>Revisión</td><td>Totales, IVA, tiempo de entrega más lento, alertas por sobre pedido o score preliminar.</td></tr>
+      <tr><td>8</td><td>Documento</td><td>PDF con marca de HighNet, sin rastro del mayorista de origen.</td></tr>
+      <tr><td>9</td><td>Seguimiento</td><td>Estatus: enviada, vista, aceptada, vencida.</td></tr>
+      <tr><td>10</td><td>Conversión a pedido</td><td>Órdenes de compra agrupadas por proveedor. Si cambió el costo, el sistema avisa antes de confirmar.</td></tr>
+    </table>
+    <p><strong>Congelado de precios:</strong> cada línea guarda una copia del costo, el tipo de cambio y el margen usados al cotizar. No se referencia el catálogo en vivo al convertir a pedido.</p>
+  </section>
+
+  <section>
+    <h2>15. Endpoints del backend</h2>
+    <h3>15.1 Públicos (catálogo y pedido)</h3>
+    <table>
+      <tr><th>Endpoint</th><th>Propósito</th></tr>
+      <tr><td>GET /api/products</td><td>Catálogo unificado. Contrato 6.1. Filtros, búsqueda y paginación.</td></tr>
+      <tr><td>GET /api/products/:id</td><td>Detalle público. Sin <code>sources</code> ni <code>raw</code>.</td></tr>
+      <tr><td>GET /api/categories</td><td>Taxonomía HighNet con conteos.</td></tr>
+      <tr><td>GET /api/brands</td><td>Marcas canónicas.</td></tr>
+      <tr><td>POST /api/orders</td><td>Checkout; congela costos y liga al maestro.</td></tr>
+      <tr><td>POST /api/quotes</td><td>Formulario de cotización web actual.</td></tr>
+      <tr><td>GET /api/banners</td><td>Home.</td></tr>
+    </table>
+    <p>Las rutas <code>/api/syscom/*</code> se deprecán hacia el frontend; el proxy a proveedor queda detrás de adaptadores.</p>
+
+    <h3>15.2 Auth y admin</h3>
+    <table>
+      <tr><th>Endpoint</th><th>Propósito</th></tr>
+      <tr><td>POST /api/auth/login</td><td>Email/password para panel.</td></tr>
+      <tr><td>GET /api/auth/me</td><td>Sesión; el frontend usa el rol para mostrar el menú.</td></tr>
+      <tr><td>GET /api/admin/stats</td><td>Dashboard existente.</td></tr>
+      <tr><td>CRUD /api/admin/banners | quotes | orders | users</td><td>Módulos ya existentes.</td></tr>
+      <tr><td>GET/PUT /api/admin/commerce/config</td><td>Margen general, IVA, redondeo, almacén CT, modo TC.</td></tr>
+      <tr><td>GET/POST /api/admin/commerce/exchange-rate</td><td>Vigente, override e historial.</td></tr>
+      <tr><td>GET/PUT /api/admin/commerce/margins/categories</td><td>Tabla de % por categoría + preview.</td></tr>
+      <tr><td>GET/PUT /api/admin/commerce/margins/products/:id</td><td>Override por SKU.</td></tr>
+      <tr><td>GET /api/admin/products/:id</td><td>Contrato 6.2: costos, preview y flags.</td></tr>
+      <tr><td>POST /api/admin/products/:id/recalculate</td><td>Recálculo puntual.</td></tr>
+      <tr><td>PATCH /api/admin/products/:id/visibility</td><td>Ocultar/mostrar.</td></tr>
+      <tr><td>GET /api/admin/anomalies</td><td>Bandeja.</td></tr>
+      <tr><td>GET /api/admin/providers</td><td>Salud de proveedores.</td></tr>
+      <tr><td>GET /api/admin/stats/catalog</td><td>Publicados, rechazados y frescura.</td></tr>
+    </table>
+
+    <h3>15.3 Posteriores</h3>
+    <p><code>POST /api/quotes</code> estructurado, <code>POST /api/quotes/:id/orders</code> y endpoints de pedido CT se mantienen como alcance posterior. La v1.0 los documentó con mayor detalle y la v1.2 conserva ese alcance sin mezclarlo con el corte mínimo del catálogo público.</p>
+  </section>
+
+  <section>
+    <h2>16. Referencia de la API CT-Connect</h2>
+    <p>Documentación oficial: <strong>https://api.ctonline.mx/documentacion.html</strong> — sandbox: <strong>sandbox.ctonline.mx</strong>.</p>
+    <p>Token: <code>POST /cliente/token</code> con <code>{ email, cliente, rfc }</code> y uso posterior del header <code>x-auth</code>. La vigencia no está documentada; el adaptador debe renovar en forma transparente y medir TTL real en sandbox.</p>
+    <table>
+      <tr><th>Endpoint</th><th>Uso HighNet</th></tr>
+      <tr><td>GET /existencia/promociones</td><td>Carga masiva de catálogo, costo, moneda y existencia para sync.</td></tr>
+      <tr><td>GET /existencia/:codigo</td><td>Existencia por almacenes; se persiste el desglose.</td></tr>
+      <tr><td>GET /existencia/:codigo/PUE</td><td>Existencia operativa de venta en Puebla.</td></tr>
+      <tr><td>GET /existencia/detalle/:codigo/:almacen</td><td>Precio, tipo de cambio, promoción y código SAT.</td></tr>
+      <tr><td>GET /existencia/promociones/:codigo</td><td>Refresco puntual antes de confirmar pedido.</td></tr>
+      <tr><td>GET /pedido/tipoCambio</td><td>TC automático.</td></tr>
+      <tr><td>GET /paqueteria/volumetria/:codigo</td><td>Peso, UPC, EAN y volumetría; base del match de confianza alta.</td></tr>
+      <tr><td>POST /pedido y /pedido/confirmar</td><td>Fase posterior; CT cancela si no se confirma en 48 h.</td></tr>
+      <tr><td>GET /pedido/listar | estatus | detalle</td><td>Seguimiento de pedidos.</td></tr>
+      <tr><td>GET /series/factura/:factura</td><td>Números de serie.</td></tr>
+    </table>
+    <div class="note">Nota editorial de integración: la v1.0 también menciona variantes como <code>/existencia/:codigo/:almacen</code> y <code>/existencia/:codigo/TOTAL</code>. La integración debe validar en sandbox la forma exacta de las rutas expuestas para no asumir una variante incorrecta.</div>
+  </section>
+
+  <section>
+    <h2>17. Roadmap por fases</h2>
+    <table>
+      <tr><th>Fase</th><th>Entregable</th><th>Alcance</th></tr>
+      <tr><td>0</td><td>Cimientos BD y auth</td><td>Migraciones MySQL, seed admin, conservación de users/orders/quotes/banners.</td></tr>
+      <tr><td>1</td><td>Adaptador CT + contrato interno</td><td>Sandbox, catálogo, existencia PUE, mapeo; Syscom envuelto como adaptador.</td></tr>
+      <tr><td>2</td><td>Normalizador básico</td><td>Bloqueantes y correctivas, marcas y categorías seed, bandeja de anomalías.</td></tr>
+      <tr><td>3</td><td>Sync y caché</td><td>Jobs, historial de costos, ejecuciones y frescura.</td></tr>
+      <tr><td>4</td><td>Comercialización y admin de %</td><td>Config, TC, márgenes, precios_publicados, preview y login discreto.</td></tr>
+      <tr><td>5</td><td>Merge y dedupe</td><td>UPC y marca+modelo; costo de referencia = menor con stock.</td></tr>
+      <tr><td>6</td><td>Catálogo unificado en el sitio</td><td>GET /api/products y deprecación de consumo directo de Syscom.</td></tr>
+      <tr><td>7</td><td>Checkout ligado al maestro</td><td>Congelado de costo/% en order_items; pedidos_proveedor manuales para Syscom.</td></tr>
+      <tr><td>8</td><td>Score y selección avanzada</td><td>Eventos, decaimiento, modos y explicación de la elección.</td></tr>
+      <tr><td>9</td><td>Pedidos CT por API</td><td>OC agrupadas, alerta 48 h, confirmación explícita.</td></tr>
+      <tr><td>10</td><td>Cotizador marca blanca</td><td>PDF, subcuentas, márgenes por cliente, seguimiento.</td></tr>
+    </table>
+    <p>La comercialización (fase 4) se adelantó respecto de la secuencia original de la v1.0 porque sin ella el catálogo unificado seguiría multiplicando <code>1.25</code> en el frontend. La v1.2 conserva ambos hechos: el corte mínimo vendible y el alcance final del cotizador.</p>
+  </section>
+
+  <section>
+    <h2>18. Decisiones tomadas y riesgos abiertos</h2>
+    <h3>18.1 Decisiones firmes</h3>
+    <ul>
+      <li>El frontend público consume una sola API interna y un solo precio de venta.</li>
+      <li>El catálogo nunca expone al cliente el mayorista ni el costo.</li>
+      <li>El admin elige porcentajes (general / categoría / producto); el motor calcula el precio final.</li>
+      <li>El login no bloquea el sitio; el menú Administración depende del rol admin.</li>
+      <li>Stock CT de venta = Puebla.</li>
+      <li>Pedidos a Syscom: manuales. Pedido del sitio: HighNet compra y envía.</li>
+      <li>Precios públicos salen de <code>precios_publicados</code>; al confirmar se consulta costo en vivo.</li>
+      <li>El normalizador no elige proveedor ni aplica %; conserva <code>sources[]</code>.</li>
+      <li>Ante duda en dedupe, no fusionar.</li>
+      <li>Se conserva y extiende el esquema 3.0 de users, orders, quotes, banners, coupons y addresses.</li>
+      <li><code>raw</code> y <code>sources</code> no viajan en GET públicos.</li>
+      <li>Las cotizaciones internas congelan precio, tipo de cambio y margen en el momento de cotizar.</li>
+    </ul>
+
+    <h3>18.2 Riesgos abiertos</h3>
+    <table>
+      <tr><th>Riesgo</th><th>Mitigación</th></tr>
+      <tr><td>CT pobre en imágenes/descripciones</td><td>Enriquecer desde Syscom si hay match; placeholder y score bajo si no.</td></tr>
+      <tr><td>Match imperfecto</td><td>Solo alta/media auto; baja a bandeja.</td></tr>
+      <tr><td>USD y TC variable</td><td>Guardar original + TC; override admin auditado; refresco en sync y al confirmar.</td></tr>
+      <tr><td>TC Syscom vs CT no comparado</td><td>Probar sandbox; hasta entonces, TC por fuente, nunca cruzado.</td></tr>
+      <tr><td>Token CT sin vigencia clara</td><td>Renovar ante 401; medir TTL en sandbox.</td></tr>
+      <tr><td>Rate limits</td><td>Sync por lotes; volumetría en job de ficha, no en cada request.</td></tr>
+      <tr><td>Carga inicial de mapeos</td><td>Priorizar lo más vendido; el resto cae en “Sin clasificar”.</td></tr>
+      <tr><td>Migración 1.25 vs IVA desglosado</td><td>Seed que deje precios públicos equivalentes el día del corte; desglosar después.</td></tr>
+      <tr><td>Admin cambia % general por error</td><td>Preview + auditoría + recálculo asíncrono; opcional confirmación por impacto.</td></tr>
+      <tr><td>Ventana de 48 h CT</td><td>Alerta y confirmación explícita.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>19. Control de cambios v1.2</h2>
+    <table>
+      <tr><th>Versión</th><th>Resumen</th></tr>
+      <tr><td>v1.0</td><td>Primera propuesta integral del orquestador/cotizador multi-proveedor para el sitio de HighNet.</td></tr>
+      <tr><td>v1.1</td><td>Se añadió el cambio adicional solicitado: comercialización configurable, panel admin, login discreto y diseño final de BD orientado al sitio actual.</td></tr>
+      <tr><td>v1.2</td><td>Integra la base conceptual y técnica de la v1.0 con el cambio adicional formalizado en la v1.1, sin duplicar contenido y dejando explícito qué partes operan hoy, cuáles son de admin y cuáles permanecen como fases posteriores.</td></tr>
+    </table>
+    <p class="muted">PDF fuente editable: <code>highnet-orquestador-catalogo-v1.2.html</code>. Generación reproducible: script Python incluido en el repositorio.</p>
+  </section>
+</body>
+</html>
